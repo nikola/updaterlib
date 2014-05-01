@@ -29,22 +29,6 @@ def _getDefaultInstallationPath(component):
     return pathname
 
 
-def _getLatestGitHubReleaseVersion(url):
-    try:
-        response = requests.get(url, headers=HEADERS_TRACKABLE).json()
-        latestVersion = response[0].get('tag_name')
-    except:
-        latestVersion = None
-
-    return latestVersion
-
-
-log = lambda x, *y: None
-def setLogger(func):
-    global log
-    log = func
-
-
 class Component(object):
 
     def __init__(self, *args, **kwargs):
@@ -57,6 +41,22 @@ class Component(object):
     def getInstalledVersion(self, *args, **kwargs): pass
     def installLatestReleaseVersion(self, *args, **kwargs): pass
     def installLatestPreReleaseVersion(self, *args, **kwargs): pass
+
+
+log = lambda x, *y: None
+def setLogger(func):
+    global log
+    log = func
+
+
+def getLatestGitHubReleaseVersion(url):
+    try:
+        response = requests.get(url, headers=HEADERS_TRACKABLE).json()
+        latestVersion = response[0].get('tag_name')
+    except:
+        latestVersion = None
+
+    return latestVersion
 
 
 def mpcHc_getLatestReleaseVersion(self):
@@ -144,7 +144,7 @@ def mpcHc_installLatestPreReleaseVersion(self, version, path, silent=False):
 
 
 def lavFilters_getLatestReleaseVersion(self):
-    return _getLatestGitHubReleaseVersion(LAVFILTERS_RELEASES)
+    return getLatestGitHubReleaseVersion(LAVFILTERS_RELEASES)
 
 
 def lavFilters_getInstalledVersion(self):
