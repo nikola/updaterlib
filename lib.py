@@ -6,8 +6,6 @@ __copyright__ = 'Copyright (c) 2014 Nikola Klaric'
 
 import time
 from hashlib import sha1 as SHA1
-from zipfile import ZipFile
-from cStringIO import StringIO
 from inspect import getmembers, ismethod
 from types import MethodType
 from operator import itemgetter
@@ -50,39 +48,24 @@ def setLogger(func):
 
 
 def getLatestGitHubReleaseVersion(url):
-    try:
-        response = requests.get(url, headers=HEADERS_TRACKABLE).json()
-        latestVersion = response[0].get('tag_name')
-    except:
-        latestVersion = None
-
-    return latestVersion
+    return requests.get(url, headers=HEADERS_TRACKABLE).json()[0].get('tag_name')
 
 
 def mpcHc_getLatestReleaseVersion(self):
-    try:
-        latestReleaseVersion = '.'.join(map(str, max([getVersionTuple(tag.get('name'))
-            for tag in requests.get(MPCHC_TAGS, headers=HEADERS_TRACKABLE).json()])))
-    except:
-        latestReleaseVersion = None
-
-    return latestReleaseVersion
+    return '.'.join(map(str, max([getVersionTuple(tag.get('name'))
+        for tag in requests.get(MPCHC_TAGS, headers=HEADERS_TRACKABLE).json()])))
 
 
 def mpcHc_getLatestPreReleaseVersion(self):
+    items = requests.post(MPCHC_NIGHTLY_URL, MPCHC_NIGHTLY_H5AI_QUERY, headers=HEADERS_TRACKABLE).json().get('items')
+    return re.match(r'^/MPC-HC\.((\d+\.?)+)\.x86\.exe$',
+        filter(lambda i: i.get('absHref').endswith('.x86.exe'), items)[0].get('absHref')).group(1)
+
+
+def mpcHc_getInstalledVersion(self, location=None):
     try:
-        items = requests.post(MPCHC_NIGHTLY_URL, MPCHC_NIGHTLY_H5AI_QUERY, headers=HEADERS_TRACKABLE).json().get('items')
-        latestPreReleaseVersion = re.match(r'^/MPC-HC\.((\d+\.?)+)\.x86\.exe$',
-            filter(lambda i: i.get('absHref').endswith('.x86.exe'), items)[0].get('absHref')).group(1)
-    except:
-        latestPreReleaseVersion = None
-
-    return latestPreReleaseVersion
-
-
-def mpcHc_getInstalledVersion(self):
-    try:
-        location = getAppLocationFromRegistry(self._identifier)
+        if location is None:
+            location = getAppLocationFromRegistry(self._identifier)
         version = getProductVersion(location)
     except:
         return None, None
@@ -90,18 +73,22 @@ def mpcHc_getInstalledVersion(self):
         return version, os.path.dirname(location)
 
 
-def mpcHc_install(exe, version, silent):
+def mpcHc_install(payload, version, pathname, silent, archive, compact=False, compatText=False):
     log('Installing MPC-HC %s ...' % version)
-    pathname = writeTempFile(exe)
-    verySilent = '/VERYSILENT ' if silent else ''
-    os.system('""%s" /NORESTART %s/NOCLOSEAPPLICATIONS""' % (pathname, verySilent))
-    os.remove(pathname)
+    if not archive:
+        pathname = writeTempFile(payload)
+        verySilent = '/VERYSILENT ' if silent else ''
+        os.system('""%s" /NORESTART %s/NOCLOSEAPPLICATIONS""' % (pathname, verySilent))
+        os.remove(pathname)
+    else:
+        unzip('MPC-HC', payload, pathname, compact, base='mpc-hc', compatText=compatText)
 
 
-def mpcHc_installLatestReleaseVersion(self, version, path, silent=False):
+def mpcHc_installLatestReleaseVersion(self, version, pathname, silent=False, archive=False, compact=False, compatText=False):
     log('Identifying filename of MPC-HC download ...')
     response = requests.get(MPCHC_DOWNLADS, headers=HEADERS_TRACKABLE).text
-    initialUrl = re.search(MPCHC_LINK_INSTALLER, response).group(1)
+    url = MPCHC_LINK_ARCHIVE if archive else MPCHC_LINK_INSTALLER
+    initialUrl = re.search(url, response).group(1)
     log(' done.\n')
 
     retries = 0
@@ -131,55 +118,68 @@ def mpcHc_installLatestReleaseVersion(self, version, path, silent=False):
         else:
             break
 
-    mpcHc_install(response, version, silent)
+    mpcHc_install(response, version, pathname, silent, archive, compact, compatText)
 
 
-def mpcHc_installLatestPreReleaseVersion(self, version, path, silent=False):
+def mpcHc_installLatestPreReleaseVersion(self, version, pathname, silent=False, archive=False, compact=False, compatText=False):
     url = MPCHC_NIGHTLY_URL_EXE.format(version)
     log('Downloading %s ...' % url)
     response = requests.get(url, headers=HEADERS_TRACKABLE).content
     log(' done.\n')
 
-    mpcHc_install(response, version, silent)
+    mpcHc_install(response, version, pathname, silent, archive, compact, compatText)
 
 
 def lavFilters_getLatestReleaseVersion(self):
     return getLatestGitHubReleaseVersion(LAVFILTERS_RELEASES)
 
 
-def lavFilters_getInstalledVersion(self):
-    version, location = getComVersionLocation(self._identifier)
-    if location.endswith('x86') or location.endswith('x64'):
-         location = os.path.abspath(os.path.join(location, os.pardir))
-    return version, location
+def lavFilters_getInstalledVersion(self, location=None):
+    try:
+        if location is None:
+            version, location = getComVersionLocation(self._identifier)
+            if location.endswith('x86') or location.endswith('x64'):
+                location = os.path.abspath(os.path.join(location, os.pardir))
+        else:
+            version = getProductVersion(location)
+    except:
+        return None, None
+    else:
+        return version, os.path.dirname(location)
 
 
-def lavFilters_installLatestReleaseVersion(self, version, path, silent=False):
-    url = LAVFILTERS_URL_EXE.format(version)
+def lavFilters_installLatestReleaseVersion(self, version, pathname, silent=False, archive=False, compact=False, compatText=False):
+    url = (LAVFILTERS_URL_ARCHIVE if archive else LAVFILTERS_URL_EXE).format(version)
     log('Downloading %s ...' % url)
-    response = requests.get(url, headers=HEADERS_TRACKABLE).content
+    blob = requests.get(url, headers=HEADERS_TRACKABLE).content
     log(' done.\n')
 
     log('Installing LAV Filters %s ...' % version)
-    pathname = writeTempFile(response)
-    os.system('""%s" /NORESTART /NOCLOSEAPPLICATIONS""' % pathname)
-    os.remove(pathname)
+    if archive:
+        unzip('LAV Filters', blob, pathname, compact, excludeExt='.bat', compatText=compatText)
+    else:
+        pathname = writeTempFile(blob)
+        os.system('""%s" /NORESTART /NOCLOSEAPPLICATIONS""' % pathname)
+        os.remove(pathname)
 
 
 def madVr_getLatestReleaseVersion(self):
+    return requests.get(MADVR_URL_VERSION, headers=HEADERS_TRACKABLE).text
+
+
+def madVr_getInstalledVersion(self, location=None):
     try:
-        latestVersion = requests.get(MADVR_URL_VERSION, headers=HEADERS_TRACKABLE).text
+        if location is None:
+            version, location = getComVersionLocation(self._identifier)
+        else:
+            version = getProductVersion(location)
     except:
-        latestVersion = None
-
-    return latestVersion
-
-
-def madVr_getInstalledVersion(self):
-    return getComVersionLocation(self._identifier)
+        return None, None
+    else:
+        return version, os.path.dirname(location)
 
 
-def madVr_installLatestReleaseVersion(self, version, path, silent=False):
+def madVr_installLatestReleaseVersion(self, version, pathname, silent=False, compact=False, compatText=False, *args, **kwargs):
     log('Downloading %s ...' % MADVR_URL_ARCHIVE)
     madVrZipFile = requests.get(MADVR_URL_ARCHIVE, headers=HEADERS_TRACKABLE).content
     log(' done.\n')
@@ -197,9 +197,10 @@ def madVr_installLatestReleaseVersion(self, version, path, silent=False):
         return
 
     log('Installing madVR %s ...' % version)
-    madVrInstallationPath = path or _getDefaultInstallationPath('madVR')
+    madVrInstallationPath = pathname or _getDefaultInstallationPath('madVR')
 
-    ZipFile(StringIO(madVrZipFile)).extractall(madVrInstallationPath)
+    excludeList = ['InstallFilter.exe', 'madVR [debug].ax'] if compact else []
+    unzip('madVR', madVrZipFile, madVrInstallationPath, compact=compact, excludeExt='.bat', excludeList=excludeList, compatText=compatText)
 
     os.system('""%s" /s "%s""'
         % (os.path.join(os.environ['SYSTEMROOT'], 'System32', 'regsvr32'), os.path.join(madVrInstallationPath, 'madVR.ax')))

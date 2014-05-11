@@ -9,6 +9,8 @@ import re
 import _winreg as registry
 from tempfile import mkstemp
 from subprocess import check_output
+from zipfile import ZipFile
+from cStringIO import StringIO
 
 
 def getVersionTuple(version):
@@ -29,13 +31,16 @@ def writeTempFile(payload):
 
 
 def getProductVersion(pathname):
-    result = check_output(
-        " ".join([
-            os.path.join(os.environ['SYSTEMROOT'], 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-            "(Get-Item '%s').VersionInfo.ProductVersion" % pathname,
-        ]),
-    ).rstrip()
-    return result
+    if not (os.path.exists(pathname) and os.path.isfile(pathname)):
+        raise ValueError
+    else:
+        result = check_output(
+            " ".join([
+                os.path.join(os.environ['SYSTEMROOT'], 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+                "(Get-Item '%s').VersionInfo.ProductVersion" % pathname,
+            ]),
+        ).strip()
+        return '.'.join(map(str, getVersionTuple(result)))
 
 
 def getComLocationFromRegistry(clsid):
@@ -51,13 +56,9 @@ def getComLocationFromRegistry(clsid):
 
 
 def getComVersionLocation(key):
-    try:
-        location = getComLocationFromRegistry(key)
-        version = getProductVersion(location)
-    except:
-        return None, None
-    else:
-        return version, os.path.dirname(location)
+    location = getComLocationFromRegistry(key)
+    version = getProductVersion(location)
+    return version, os.path.dirname(location)
 
 
 def getAppLocationFromRegistry(software):
@@ -70,3 +71,25 @@ def getAppLocationFromRegistry(software):
         return pathname
     else:
         raise
+
+
+def unzip(context, blob, pathname, compact=False, base=None, excludeExt=None, excludeList=[], compatText=False):
+    zipFile = ZipFile(StringIO(blob))
+    for member in zipFile.namelist():
+        filename = zipFile.getinfo(member).filename
+        if (excludeExt is not None and filename.lower().endswith(excludeExt)) or filename in excludeList:
+            continue
+        elif filename.find('/') != -1:
+            container = filename[:filename.index('/')]
+            if base is not None and container.lower().startswith(base):
+                filename = filename[filename.index('/')+1:]
+
+            if not filename or (compact and '/' in filename):
+                continue
+            elif filename.endswith('/'):
+                os.makedirs(os.path.join(pathname, os.path.normpath(filename)))
+        if compact and compatText and (filename.endswith('.txt') or filename == 'COPYING'):
+            filename = '[%s] %s' % (context, filename)
+        with open(os.path.join(pathname, os.path.normpath(filename)), 'wb') as fp:
+            fp.write(zipFile.open(member).read())
+    zipFile.close()
