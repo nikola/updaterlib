@@ -200,7 +200,8 @@ def madVr_installLatestReleaseVersion(self, version, pathname, silent=False, com
     madVrInstallationPath = pathname or _getDefaultInstallationPath('madVR')
 
     excludeList = ['InstallFilter.exe', 'madVR [debug].ax'] if compact else []
-    unzip('madVR', madVrZipFile, madVrInstallationPath, compact=compact, excludeExt='.bat', excludeList=excludeList, compatText=compatText)
+    excludeExt = '.bat' if compact else None
+    unzip('madVR', madVrZipFile, madVrInstallationPath, compact=compact, excludeExt=excludeExt, excludeList=excludeList, compatText=compatText)
 
     os.system('""%s" /s "%s""'
         % (os.path.join(os.environ['SYSTEMROOT'], 'System32', 'regsvr32'), os.path.join(madVrInstallationPath, 'madVR.ax')))

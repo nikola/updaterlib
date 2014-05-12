@@ -80,14 +80,18 @@ def unzip(context, blob, pathname, compact=False, base=None, excludeExt=None, ex
         if (excludeExt is not None and filename.lower().endswith(excludeExt)) or filename in excludeList:
             continue
         elif filename.find('/') != -1:
-            container = filename[:filename.index('/')]
-            if base is not None and container.lower().startswith(base):
+            if base is not None and filename[:filename.index('/')].lower().startswith(base):
                 filename = filename[filename.index('/')+1:]
-
-            if not filename or (compact and '/' in filename):
-                continue
+                if not filename or (compact and '/' in filename):
+                    continue
             elif filename.endswith('/'):
                 os.makedirs(os.path.join(pathname, os.path.normpath(filename)))
+                continue
+            else:
+                try:
+                    os.makedirs(os.path.join(pathname, os.path.normpath(filename[:filename.rindex('/')])))
+                except WindowsError:
+                    pass
         if compact and compatText and (filename.endswith('.txt') or filename == 'COPYING'):
             filename = '[%s] %s' % (context, filename)
         with open(os.path.join(pathname, os.path.normpath(filename)), 'wb') as fp:
