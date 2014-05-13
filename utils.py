@@ -55,6 +55,14 @@ def getComLocationFromRegistry(clsid):
         raise
 
 
+def addAppLocationRegistryKey(software, location):
+    connection = registry.ConnectRegistry(None, registry.HKEY_CURRENT_USER)
+    key = registry.OpenKey(connection, r'Software\%s' % software, 0, registry.KEY_WRITE)
+    registry.SetValueEx(key, 'ExePath', 0, registry.REG_SZ, location)
+    registry.FlushKey(key)
+    key.Close()
+
+
 def getComVersionLocation(key):
     location = getComLocationFromRegistry(key)
     version = getProductVersion(location)

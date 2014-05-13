@@ -18,6 +18,8 @@ from utils import *
 
 BLACK, GREEN, RED = 15, 10, 12
 
+MPC_HC_LOG = '%s_MPC-HC.log' % time.strftime('%Y-%m-%d')
+
 
 def _getDefaultInstallationPath(component):
     pathname = os.path.join(os.environ['PROGRAMFILES'], component)
@@ -37,6 +39,7 @@ class Component(object):
     def getLatestReleaseVersion(self, *args, **kwargs): pass
     def getLatestPreReleaseVersion(self, *args, **kwargs): pass
     def getInstalledVersion(self, *args, **kwargs): pass
+    def getPostInstallVersion(self, *args, **kwargs): return self.getInstalledVersion(*args, **kwargs)
     def installLatestReleaseVersion(self, *args, **kwargs): pass
     def installLatestPreReleaseVersion(self, *args, **kwargs): pass
 
@@ -62,7 +65,7 @@ def mpcHc_getLatestPreReleaseVersion(self):
         filter(lambda i: i.get('absHref').endswith('.x86.exe'), items)[0].get('absHref')).group(1)
 
 
-def mpcHc_getInstalledVersion(self, location=None):
+def mpcHc_getInstalledVersion(self, location=None, *args, **kwargs):
     try:
         if location is None:
             location = getAppLocationFromRegistry(self._identifier)
@@ -73,12 +76,33 @@ def mpcHc_getInstalledVersion(self, location=None):
         return version, os.path.dirname(location)
 
 
+def mpcHc_getPostInstallVersion(self, cwd, *args, **kwargs):
+    logPathname = os.path.join(cwd, MPC_HC_LOG)
+    if os.path.exists(logPathname):
+        with open(logPathname, 'rU') as fd:
+            protocol = fd.read()
+        if protocol.find('Installation process succeeded.') != -1:
+            installationSearch = re.search('Directory for uninstall files:\s+(.*?)$', protocol, re.M)
+            if installationSearch is not None:
+                location = installationSearch.group(1)
+                mpcHcexecutable = os.path.join(location, 'mpc-hc.exe')
+                version = getProductVersion(mpcHcexecutable)
+
+                # Manually set the installation directory in the Windows registry
+                # in case the user did not launch MPC-HC at the last step in InnoSetup.
+                addAppLocationRegistryKey(r'MPC-HC\MPC-HC', mpcHcexecutable)
+
+                return version, location
+
+    return None
+
+
 def mpcHc_install(payload, version, pathname, silent, archive, compact=False, compatText=False):
     log('Installing MPC-HC %s ...' % version)
     if not archive:
         pathname = writeTempFile(payload)
         verySilent = '/VERYSILENT ' if silent else ''
-        os.system('""%s" /NORESTART %s/NOCLOSEAPPLICATIONS""' % (pathname, verySilent))
+        os.system('""%s" /NORESTART %s/NOCLOSEAPPLICATIONS /LOG=%s""' % (pathname, verySilent, MPC_HC_LOG))
         os.remove(pathname)
     else:
         unzip('MPC-HC', payload, pathname, compact, base='mpc-hc', compatText=compatText)
@@ -134,7 +158,7 @@ def lavFilters_getLatestReleaseVersion(self):
     return getLatestGitHubReleaseVersion(LAVFILTERS_RELEASES)
 
 
-def lavFilters_getInstalledVersion(self, location=None):
+def lavFilters_getInstalledVersion(self, location=None, *args, **kwargs):
     try:
         if location is None:
             version, location = getComVersionLocation(self._identifier)
@@ -167,7 +191,7 @@ def madVr_getLatestReleaseVersion(self):
     return requests.get(MADVR_URL_VERSION, headers=HEADERS_TRACKABLE).text
 
 
-def madVr_getInstalledVersion(self, location=None):
+def madVr_getInstalledVersion(self, location=None, *args, **kwargs):
     try:
         if location is None:
             version, location = getComVersionLocation(self._identifier)
