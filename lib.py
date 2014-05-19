@@ -11,6 +11,7 @@ from types import MethodType
 from operator import itemgetter
 
 import requests
+from lxml.html.clean import clean_html
 
 from const import *
 from utils import *
@@ -94,7 +95,7 @@ def mpcHc_getPostInstallVersion(self, cwd, *args, **kwargs):
 
                 return version, location
 
-    return None
+    return None, None
 
 
 def mpcHc_install(payload, version, pathname, silent, archive, compact=False, compatText=False):
@@ -110,9 +111,9 @@ def mpcHc_install(payload, version, pathname, silent, archive, compact=False, co
 
 def mpcHc_installLatestReleaseVersion(self, version, pathname, silent=False, archive=False, compact=False, compatText=False):
     log('Identifying filename of MPC-HC download ...')
-    response = requests.get(MPCHC_DOWNLADS, headers=HEADERS_TRACKABLE).text
+    html = clean_html(requests.get(MPCHC_DOWNLADS, headers=HEADERS_TRACKABLE).text)
     url = MPCHC_LINK_ARCHIVE if archive else MPCHC_LINK_INSTALLER
-    initialUrl = re.search(url, response).group(1)
+    initialUrl = re.search(url, html).group(1)
     log(' done.\n')
 
     retries = 0
