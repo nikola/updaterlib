@@ -78,7 +78,8 @@ def mpcHc_getInstalledVersion(self, location=None, *args, **kwargs):
 
 
 def mpcHc_getPostInstallVersion(self, cwd, *args, **kwargs):
-    logPathname = os.path.join(cwd, MPC_HC_LOG)
+    # logPathname = os.path.join(cwd, MPC_HC_LOG)
+    logPathname = MPC_HC_LOG
     if os.path.exists(logPathname):
         with open(logPathname, 'rU') as fd:
             protocol = fd.read()
