@@ -101,6 +101,8 @@ def unzip(context, blob, pathname, compact=False, base=None, excludeExt=None, ex
                 filename = filename[filename.index('/')+1:]
                 if not filename or (compact and '/' in filename):
                     continue
+            elif compact:
+                continue
             elif filename.endswith('/'):
                 os.makedirs(os.path.join(pathname, os.path.normpath(filename)))
                 continue
