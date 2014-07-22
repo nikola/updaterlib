@@ -77,8 +77,7 @@ def mpcHc_getInstalledVersion(self, location=None, *args, **kwargs):
         return version, os.path.dirname(location)
 
 
-def mpcHc_getPostInstallVersion(self, cwd, *args, **kwargs):
-    # logPathname = os.path.join(cwd, MPC_HC_LOG)
+def mpcHc_getPostInstallVersion(self, *args, **kwargs):
     logPathname = MPC_HC_LOG
     if os.path.exists(logPathname):
         with open(logPathname, 'rU') as fd:
@@ -162,12 +161,12 @@ def lavFilters_getLatestReleaseVersion(self):
 
 def lavFilters_getInstalledVersion(self, location=None, *args, **kwargs):
     try:
-        if location is None:
+        if location is not None:
+            version = getProductVersion(location)
+        else:
             version, location = getComVersionLocation(self._identifier)
             if location.endswith('x86') or location.endswith('x64'):
                 location = os.path.abspath(os.path.join(location, os.pardir))
-        else:
-            version = getProductVersion(location)
     except:
         return None, None
     else:
@@ -195,10 +194,10 @@ def madVr_getLatestReleaseVersion(self):
 
 def madVr_getInstalledVersion(self, location=None, *args, **kwargs):
     try:
-        if location is None:
-            version, location = getComVersionLocation(self._identifier)
-        else:
+        if location is not None:
             version = getProductVersion(location)
+        else:
+            version, location = getComVersionLocation(self._identifier)
     except:
         return None, None
     else:
