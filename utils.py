@@ -8,7 +8,8 @@ import os
 import re
 import _winreg as registry
 from tempfile import mkstemp
-from subprocess import check_output
+from ctypes import windll, create_string_buffer, c_uint, byref, string_at
+from array import array
 from zipfile import ZipFile
 from cStringIO import StringIO
 
@@ -31,16 +32,24 @@ def writeTempFile(payload):
 
 
 def getProductVersion(pathname):
-    if not (os.path.exists(pathname) and os.path.isfile(pathname)):
-        raise ValueError
-    else:
-        result = check_output(
-            " ".join([
-                os.path.join(os.environ['SYSTEMROOT'], 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-                "(Get-Item '%s').VersionInfo.ProductVersion" % pathname,
-            ]),
-        ).strip()
-        return '.'.join(map(str, getVersionTuple(result)))
+    if os.path.exists(pathname) and os.path.isfile(pathname):
+        filename = unicode(pathname)
+
+        size = windll.version.GetFileVersionInfoSizeW(filename, None)
+        if size:
+            res = create_string_buffer(size)
+            windll.version.GetFileVersionInfoW(filename, None, size, res)
+            r = c_uint()
+            l = c_uint()
+            windll.version.VerQueryValueA(res, '\\VarFileInfo\\Translation', byref(r), byref(l))
+            if l.value:
+                windll.version.VerQueryValueA(
+                    res,
+                    '\\StringFileInfo\\%04x%04x\\FileVersion' % tuple(array('H', string_at(r.value, l.value))[:2].tolist()),
+                    byref(r), byref(l),
+                )
+                return '.'.join(map(str, getVersionTuple(string_at(r.value, l.value))))
+    raise ValueError
 
 
 def getComLocationFromRegistry(clsid):
