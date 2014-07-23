@@ -23,5 +23,5 @@ MADVR_URL_VERSION = 'http://madshi.net/madVR/version.txt'
 MADVR_URL_HASH = 'http://madshi.net/madVR/sha1.txt'
 MADVR_URL_ARCHIVE = 'http://madshi.net/madVR.zip'
 
-HEADERS_TRACKABLE = {'User-agent': 'htpc-updater (https://github.com/nikola/htpc-updater)'}
-HEADERS_SF = {'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36'}
+HEADERS_TRACKABLE = {'User-Agent': 'htpc-updater (https://github.com/nikola/htpc-updater)'}
+HEADERS_SF = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36'}
